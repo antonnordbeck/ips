@@ -1,24 +1,37 @@
-use serde::Deserialize;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-#[derive(Debug, Deserialize)]
-struct Pos{
-    x: f32,
-    y: f32,
-    z: f32
-}
-
+extern crate nalgebra as na;
 fn main(){
-    let mut rdr = csv::ReaderBuilder::new().has_headers(false).delimiter(b' ').from_path("positions.xyz").unwrap();
-    let positions: Vec<Pos> = rdr.deserialize().map(|pos| pos.unwrap()).collect();
+    let time = std::time::Instant::now();
 
+    rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
+
+    let mut rdr = csv::ReaderBuilder::new().has_headers(false).delimiter(b' ').from_path("positions_large.xyz").unwrap();
+    let positions: Vec<na::Point3<f32>> = rdr.deserialize().map(|pos| pos.unwrap()).collect();
+
+    let N =positions.len();
+
+    let num: usize = (0..N).into_par_iter().fold(|| 0_usize, |sum: usize, i| {
+        let mut sum = sum;
+        for j in (i+1)..N{
+            if na::distance_squared(&positions[i],&positions[j]) <= 0.0025{
+                sum += 1;
+            }
+        }
+        return sum;
+    }).sum();
+
+    /*
     let mut num = 0;
+
     for i in 0..positions.len(){
         for j in (i+1)..positions.len(){
-            let dist = f32::sqrt((positions[i].x+positions[j].x).powi(2)+(positions[i].y+positions[j].y).powi(2)+(positions[i].z+positions[j].z).powi(2));
-            if dist <= 0.05{
+            if na::distance_squared(&positions[i],&positions[j]) <= 0.0025{
                 num += 1;
             }
         }
     }
-    println!("{}", num)
+    */
+    println!("Calculated collisions in {}s.", time.elapsed().as_secs_f64());
+    println!("{} collisions found.", num);
 }

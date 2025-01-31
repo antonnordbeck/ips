@@ -86,25 +86,6 @@ fn main(){
      * but the more the points are spread out the nearer linear time the algorithm will become.
      */
     let time = std::time::Instant::now();
-    //let num = collide(&pos, 0, pos.len());
-
-/*     let n =pos.len();
-    let block_size: usize = n/1000;
-    let num: usize = std::iter::successors(Some(0), |b| if b < &n { Some(b+block_size)} else {None}).par_bridge().map(|b|{
-        let mut num = 0;
-        for i in b..(b+block_size).min(n-1){
-            for j in (i+1)..n{
-                if pos[j].x-pos[i].x > 0.05{
-                    break;
-                }
-                if na::distance_squared(&pos[i],&pos[j]) <= 0.0025{
-                    num += 1;
-                }
-            }
-        }
-        return num;
-    }).sum();
-     */
     let num = collide(&pos, 0, pos.len());
     println!("\tCollision time \t{}s.", time.elapsed().as_secs_f64());
     println!("{} collisions found.", num);

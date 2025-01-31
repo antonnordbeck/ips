@@ -30,8 +30,8 @@ fn parse(buf: &[u8])->Vec<Vec<na::Point3<f32>>>{
     }
 }
 fn collide(pos: &Vec<na::Point3<f32>>, a:usize, b:usize)->usize{
-    if (b-a) >= 100{
-        let mid = (b-a)/2;
+    if (b-a) >= 1500{
+        let mid = (b+a)/2;
         let (lo, hi) = rayon::join(|| collide(pos, a, mid), || collide(pos, mid, b));
         return lo + hi;
     }
@@ -52,7 +52,6 @@ fn collide(pos: &Vec<na::Point3<f32>>, a:usize, b:usize)->usize{
 }
 fn main(){
     let args: Vec<String> = std::env::args().collect();
-    rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
     /* Load data from file.
      * Uses pararell parsing to parse the file, it is sligthly slower for smaller data sets but scales better with big datasets.

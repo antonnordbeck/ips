@@ -1,2 +1,2 @@
-# isp
-Solution to ISP challenge 
+# IPS
+Solution to IPS challenge 

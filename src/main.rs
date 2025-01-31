@@ -1,7 +1,5 @@
 use std::io::Read;
-
-use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
-
+use rayon::slice::ParallelSliceMut;
 extern crate nalgebra as na;
 
 fn parse(buf: &[u8])->Vec<Vec<na::Point3<f32>>>{
@@ -59,6 +57,7 @@ fn main(){
     let path = if args.len() > 1 { args[1].as_str() } else {"positions_large.xyz"};
 
     println!("Loading positions from {}.", path);
+    let total_time = std::time::Instant::now();
     let time = std::time::Instant::now();
     let mut file = std::fs::File::open(path).unwrap();
     let mut buf = Vec::new();
@@ -68,12 +67,12 @@ fn main(){
         pos.append(&mut p);
     }
 
-    println!("\tFile load time \t{}s.", time.elapsed().as_secs_f64());
+    println!("\tFile load time: {}s", time.elapsed().as_secs_f64());
 
     /* Sort points by their x position using parallel sort*/
     let time = std::time::Instant::now();
     pos.as_mut_slice().par_sort_unstable_by(|a,b| a.x.total_cmp(&b.x));
-    println!("\tSort time \t{}s.", time.elapsed().as_secs_f64());
+    println!("\tSort time: \t{}s", time.elapsed().as_secs_f64());
 
     /* Find all point near each other.
      * Uses the fact that the point are sorted by x and that the distance between the points a and b
@@ -87,7 +86,7 @@ fn main(){
      */
     let time = std::time::Instant::now();
     let num = collide(&pos, 0, pos.len());
-    println!("\tCollision time \t{}s.", time.elapsed().as_secs_f64());
+    println!("\tCollision time: {}s", time.elapsed().as_secs_f64());
+    println!("\tTotal time: \t{}s", total_time.elapsed().as_secs_f64());
     println!("{} collisions found.", num);
 }
-//1436965 expected collisions

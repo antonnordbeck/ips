@@ -1,43 +1,57 @@
 use std::io::Read;
 
-use na::min;
 use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
 
 extern crate nalgebra as na;
 
-static THREAD_N: usize = 8;
-
-fn parse(buf: &Vec<u8>, n:usize , a:usize)->Vec<na::Point3<f32>>{
-    if a < n{
-        let mut b = min(a+ n/THREAD_N, n);
-        while b < n && buf[b] != b'\n' {
-            b += 1;
+fn parse(buf: &[u8])->Vec<Vec<na::Point3<f32>>>{
+    let n = buf.len();
+    if n > 500000{
+        let mut mid = n/2;
+        while mid < n && buf[mid] != b'\n' {
+            mid += 1;
         }
-        let slice = &buf[a..b];
-        let (mut lo, mut hi) = rayon::join(|| {
-            let mut pos = Vec::with_capacity(n/59/THREAD_N);//About 59 bytes per point
-            for line in  std::str::from_utf8(slice).unwrap().lines(){
-                let mut iter: std::str::SplitAsciiWhitespace<'_> = line.split_ascii_whitespace();
-                pos.push(na::Point3::new(
-                    iter.next().unwrap().parse().unwrap(),
-                    iter.next().unwrap().parse().unwrap(),
-                    iter.next().unwrap().parse().unwrap()
-                ))
-            }
-            pos
-        }, || {
-            parse(buf, n, b+1)
-        });
+
+        let (mut lo, mut hi) = rayon::join(|| parse(&buf[..mid]), || parse(&buf[(mid+1)..]));
         lo.append(&mut hi);
-        lo
+        return  lo;
     }
     else{
-        return Vec::with_capacity(n/59);
+        let mut pos = Vec::with_capacity(n/59);//About 59 bytes per point
+        for line in  std::str::from_utf8(buf).unwrap().lines(){
+            let mut iter: std::str::SplitAsciiWhitespace<'_> = line.split_ascii_whitespace();
+            pos.push(na::Point3::new(
+                iter.next().unwrap().parse().unwrap(),
+                iter.next().unwrap().parse().unwrap(),
+                iter.next().unwrap().parse().unwrap()
+            ))
+        }
+        vec![pos]
+    }
+}
+fn collide(pos: &Vec<na::Point3<f32>>, a:usize, b:usize)->usize{
+    if (b-a) >= 100{
+        let mid = (b-a)/2;
+        let (lo, hi) = rayon::join(|| collide(pos, a, mid), || collide(pos, mid, b));
+        return lo + hi;
+    }
+    else {
+        let mut num = 0;
+        for i in a..b{
+            for j in (i+1)..pos.len(){
+                if pos[j].x-pos[i].x > 0.05{
+                    break;
+                }
+                if na::distance_squared(&pos[i],&pos[j]) <= 0.0025{
+                    num += 1;
+                }
+            }
+        }
+        return num;
     }
 }
 fn main(){
     let args: Vec<String> = std::env::args().collect();
-
     rayon::ThreadPoolBuilder::new().num_threads(16).build_global().unwrap();
 
     /* Load data from file.
@@ -50,7 +64,10 @@ fn main(){
     let mut file = std::fs::File::open(path).unwrap();
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
-    let mut pos: Vec<na::Point3<f32>> = parse(&buf, buf.len(), 0);
+    let mut pos: Vec<na::Point3<f32>> = Vec::with_capacity(buf.len()/59);
+    for mut p in parse(&buf){
+        pos.append(&mut p);
+    }
 
     println!("\tFile load time \t{}s.", time.elapsed().as_secs_f64());
 
@@ -72,7 +89,7 @@ fn main(){
     let time = std::time::Instant::now();
     //let num = collide(&pos, 0, pos.len());
 
-    let n =pos.len();
+/*     let n =pos.len();
     let block_size: usize = n/1000;
     let num: usize = std::iter::successors(Some(0), |b| if b < &n { Some(b+block_size)} else {None}).par_bridge().map(|b|{
         let mut num = 0;
@@ -88,7 +105,8 @@ fn main(){
         }
         return num;
     }).sum();
-    
+     */
+    let num = collide(&pos, 0, pos.len());
     println!("\tCollision time \t{}s.", time.elapsed().as_secs_f64());
     println!("{} collisions found.", num);
 }
